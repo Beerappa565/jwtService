@@ -2,6 +2,7 @@ package com.jwt.authService.config;
 
 import com.jwt.authService.Reposiotry.UserRepository;
 import com.jwt.authService.entity.User;
+import com.jwt.authService.userService.TokenBlacklistService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -22,6 +23,8 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
     private final UserRepository userRepository;
+    private final TokenBlacklistService tokenBlacklistService;
+
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
@@ -37,22 +40,26 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         }
 
         String token = authHeader.substring(7);
-        String username = jwtService.extractUsername(token);
+        String email = jwtService.extractUsername(token);
+        if (tokenBlacklistService.isBlacklisted(token)) {
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            response.getWriter().write("Token has been invalidated.");
+            return;
+        }
 
-        if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+        if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
             if (jwtService.isTokenValid(token)) {
-                User user = userRepository.findByEmail(username).orElse(null);
+                User user = userRepository.findByEmail(email).orElse(null);
 
                 if (user != null) {
                     UserDetails userDetails = org.springframework.security.core.userdetails.User
                             .withUsername(user.getEmail())
-                            .password(user.getPassword()) // not used in JWT, but required
-                            .authorities(user.getRole()) // or Collections.emptyList()
+                            .password(user.getPassword())
+                            .authorities(new SimpleGrantedAuthority(user.getRole()))
                             .build();
 
-                    UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
-                            userDetails, null, userDetails.getAuthorities()
-                    );
+                    UsernamePasswordAuthenticationToken authToken =
+                            new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
 
                     authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                     SecurityContextHolder.getContext().setAuthentication(authToken);
@@ -62,6 +69,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
         filterChain.doFilter(request, response);
     }
+
 }
 
 

@@ -2,6 +2,7 @@ package com.jwt.authService.config;
 
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -21,10 +22,6 @@ public class JwtService {
 
     private Key getSignKey() {
         return Keys.hmacShaKeyFor(secret.getBytes());
-    }
-
-    public String generateAccessToken(String username) {
-        return generateToken(username, TOKEN_VALIDITY);
     }
 
     public String generateRefreshToken(String username) {
@@ -62,6 +59,14 @@ public class JwtService {
             }
 
     }
+    public String extractTokenFromHeader(HttpServletRequest request) {
+        String authHeader = request.getHeader("Authorization");
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            return authHeader.substring(7);
+        }
+        throw new RuntimeException("Invalid Authorization header");
+    }
+
 
 
 }

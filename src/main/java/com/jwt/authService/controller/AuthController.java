@@ -4,7 +4,9 @@ package com.jwt.authService.controller;
 import com.jwt.authService.config.JwtService;
 import com.jwt.authService.dto.*;
 import com.jwt.authService.userService.AuthService;
+import com.jwt.authService.userService.TokenBlacklistService;
 import com.jwt.authService.userService.UserService;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -18,6 +20,7 @@ public class AuthController {
     private final UserService userService;
     private final AuthService authService;
     private final JwtService jwtService;
+    private final TokenBlacklistService blacklistToken;
 
     @PostMapping("/register")
     public ResponseEntity<ApiResponse> register(@RequestBody RegisterRequest request) {
@@ -43,17 +46,17 @@ public class AuthController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
 
-        String newAccessToken = jwtService.generateToken(username, 15 * 60 * 1000); // 15 min
         String newRefreshToken = jwtService.generateToken(username, 15 * 60 * 1000); // optional
 
-        return ResponseEntity.ok(new AuthResponse(newAccessToken, newRefreshToken));
+        return ResponseEntity.ok(new AuthResponse(newRefreshToken));
     }
-    @GetMapping("/{id}")
-    public ResponseEntity<UserDto> getUserDetails(@PathVariable long id) {
-        System.out.println("Register endpoint hit");
+    @PostMapping("/logout")
+    public ResponseEntity<?> logout(HttpServletRequest request) {
+        String token = jwtService.extractTokenFromHeader(request);
+        blacklistToken.blacklistToken(token);
+        return ResponseEntity.ok("Logged out successfully");
+    }
 
-        return ResponseEntity.ok(userService.getUser(id));
-    }
 
 
 
